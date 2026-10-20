@@ -1,0 +1,8 @@
+{
+  "token": "будет_создан_автоматически_при_первом_запуске",
+  "customCommands": [
+    { "id": "spotify", "label": "Spotify",   "cmd": "spotify" },
+    { "id": "night",   "label": "Ночь",      "cmd": "echo пример: выключить Wi-Fi или запустить свой скрипт" },
+    { "id": "site",    "label": "Открыть почту", "cmd": "xdg-open https://mail.google.com" }
+  ]
+}

@@ -1,0 +1,1079 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0E1422">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Пульт">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<title>Пульт ноутбука</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0E1422; --bg2:#121A2B; --surface:#192234; --surface2:#1E293E; --line:#2A374F;
+    --ink:#EAF0F8; --muted:#8696AE; --faint:#566379;
+    --power:#FF5A60; --power-dim:rgba(255,90,96,.14);
+    --safe:#37C8A0; --accent:#5B8DEF; --accent-dim:rgba(91,141,239,.16); --warm:#FFB454;
+    --shadow:0 18px 40px -20px rgba(0,0,0,.85);
+    --nav-h:94px;
+    color-scheme:dark; box-sizing:border-box;
+  }
+  *,*::before,*::after{box-sizing:inherit;margin:0;padding:0}
+  html{background:var(--bg)}
+  body{
+    min-height:100vh;min-height:100dvh;
+    background:radial-gradient(130% 80% at 50% -10%,#182544 0%,var(--bg) 55%) fixed;
+    color:var(--ink);font-family:Manrope,system-ui,-apple-system,sans-serif;
+    -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;
+    overscroll-behavior-y:none;   /* без «потянуть, чтобы обновить», обычная прокрутка остаётся */
+    -webkit-user-select:none;user-select:none;
+  }
+  button{font:inherit;color:inherit;border:none;background:none;cursor:pointer;touch-action:manipulation}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  input,select,textarea{font:inherit;font-size:16px;-webkit-user-select:text;user-select:text}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+
+  .app{max-width:480px;margin:0 auto;display:flex;flex-direction:column;
+    min-height:100vh;min-height:100dvh;
+    padding:calc(env(safe-area-inset-top,0px) + 14px) 18px calc(env(safe-area-inset-bottom,0px) + var(--nav-h))}
+
+  /* шапка */
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .host{min-width:0}
+  .host .name{font-size:1.3rem;font-weight:800;letter-spacing:-.02em;line-height:1.1;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .host .os{font-size:.8rem;color:var(--faint);font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .live{display:inline-flex;align-items:center;gap:7px;font-size:.82rem;font-weight:600;color:var(--muted);
+    background:var(--surface);padding:7px 12px;border-radius:999px;border:1px solid var(--line);white-space:nowrap;flex:0 0 auto}
+  .live .bat{color:var(--ink);font-variant-numeric:tabular-nums;padding-left:7px;border-left:1px solid var(--line)}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+  .pulse.on{background:var(--safe);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(55,200,160,.5)}70%{box-shadow:0 0 0 7px rgba(55,200,160,0)}100%{box-shadow:0 0 0 0 rgba(55,200,160,0)}}
+
+  /* датчики */
+  .gauges{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:16px}
+  .gauge{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:13px 14px;min-width:0}
+  .gauge .k{font-size:.72rem;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gauge .v{font-size:1.15rem;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gauge .v small{font-size:.7rem;color:var(--faint);font-weight:600}
+  .gauge .v .bolt{display:inline-block;width:14px;height:14px;margin-left:3px;color:var(--warm);vertical-align:-1px}
+  .gauge .v .bolt svg{width:100%;height:100%;display:block}
+  .bar{height:4px;border-radius:4px;background:var(--line);margin-top:9px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:4px;background:var(--accent);transition:width .6s ease}
+
+  .page{animation:rise .3s cubic-bezier(.2,.7,.3,1)}
+  .page.fill{flex:1;display:flex;flex-direction:column;margin-top:14px}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  .section-label{font-size:.98rem;font-weight:700;margin:26px 2px 12px;display:flex;align-items:center;gap:8px}
+  .section-label svg{width:18px;height:18px;color:var(--muted);flex:0 0 auto}
+  .section-label span{color:var(--faint);font-weight:600;font-size:.78rem;margin-left:auto;text-align:right}
+
+  /* кнопка питания */
+  .dial-wrap{display:grid;place-items:center;margin:26px 0 4px}
+  .dial{position:relative;width:200px;height:200px;border-radius:50%;
+    background:radial-gradient(circle at 50% 35%,var(--surface2),var(--bg2));
+    box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.05)}
+  .dial::before{content:"";position:absolute;inset:14px;border-radius:50%;border:1px solid var(--line)}
+  .dial .svg{position:absolute;inset:0;transform:rotate(-90deg)}
+  .dial .glyph{position:absolute;inset:0;display:grid;place-items:center;color:var(--power);
+    transition:transform .2s ease,filter .2s ease}
+  .dial.armed .glyph{transform:scale(1.07);filter:drop-shadow(0 0 16px rgba(255,90,96,.6))}
+  .dial .glyph svg{width:66px;height:66px}
+  .hint{color:var(--muted);font-size:.86rem;margin-top:14px;font-weight:600;text-align:center;min-height:1.3em}
+
+  /* плитки */
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .grid.two{grid-template-columns:1fr 1fr}
+  .grid + .grid{margin-top:10px}
+  .tile{position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--line);
+    border-radius:18px;padding:16px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    min-height:84px;transition:transform .09s ease,background .15s ease}
+  .tile:active{transform:scale(.95);background:var(--surface2)}
+  .tile svg{width:24px;height:24px;color:var(--ink);flex:0 0 auto}
+  .tile .lbl{font-size:.8rem;font-weight:700;text-align:center;line-height:1.15}
+  .tile .sub{font-size:.67rem;color:var(--faint);font-weight:600;margin-top:-4px}
+  .tile.danger svg{color:var(--power)}
+  .tile.warm svg{color:var(--warm)}
+  .tile.accent svg{color:var(--accent)}
+  .tile.big{min-height:96px}
+  .tile.big svg{width:30px;height:30px}
+  .tile .hold{position:absolute;left:0;bottom:0;height:3px;background:var(--power);width:0}
+  .tile.small{padding:12px 6px;gap:6px;min-height:68px}
+  .tile.small svg{width:21px;height:21px}
+  .tile.small .lbl{font-size:.74rem}
+
+  /* трекпад */
+  .pad{position:relative;flex:1 1 auto;min-height:260px;max-height:640px;
+    border-radius:24px 24px 0 0;border:1px solid var(--line);border-bottom:none;
+    background:linear-gradient(170deg,var(--surface2),var(--surface));touch-action:none;overflow:hidden;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+  .pad .mesh{position:absolute;inset:0;opacity:.5;
+    background-image:radial-gradient(circle,var(--line) 1px,transparent 1px);background-size:22px 22px}
+  .pad .tip{position:absolute;inset:0 52px 0 0;display:grid;place-items:center;text-align:center;color:var(--faint);
+    font-size:.82rem;font-weight:600;line-height:1.8;transition:opacity .35s;padding:0 16px;pointer-events:none}
+  .pad .tip b{color:var(--muted);font-weight:700}
+  .pad.used .tip{opacity:0}
+  .pad.dragging{box-shadow:inset 0 0 0 2px rgba(91,141,239,.55)}
+  .ripple{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--accent);
+    transform:translate(-50%,-50%);pointer-events:none;animation:rip .5s ease-out forwards}
+  @keyframes rip{from{opacity:.65;transform:translate(-50%,-50%) scale(1)}to{opacity:0;transform:translate(-50%,-50%) scale(7)}}
+  /* полоса прокрутки у правого края, как на тачпаде ноутбука */
+  .strip{position:absolute;top:0;right:0;bottom:0;width:52px;border-left:1px dashed var(--line);
+    display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 0;
+    color:var(--faint);transition:background .15s,color .15s}
+  .strip svg{width:18px;height:18px}
+  .strip .rail{flex:1;width:4px;border-radius:4px;margin:10px 0;
+    background:repeating-linear-gradient(to bottom,var(--line) 0 6px,transparent 6px 12px)}
+  .strip.on{background:var(--accent-dim);color:var(--accent)}
+  .strip.on .rail{background:repeating-linear-gradient(to bottom,var(--accent) 0 6px,transparent 6px 12px)}
+  .pad-btns{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:0 0 24px 24px;overflow:hidden}
+  .pad-btn{background:var(--surface);padding:17px 8px;font-weight:700;font-size:.88rem;
+    transition:background .12s;display:flex;align-items:center;justify-content:center;gap:8px}
+  .pad-btn:active{background:var(--surface2)}
+  .pad-btn svg{width:19px;height:19px;color:var(--muted)}
+  .pad-bar{display:flex;align-items:stretch;gap:9px;margin-top:12px}
+  .pad-bar .seg{flex:1;min-width:0}
+  .pad-bar .seg button{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .kbd-btn{flex:0 0 auto;width:52px;border-radius:14px;display:grid;place-items:center;
+    background:var(--surface);border:1px solid var(--line);color:var(--muted);transition:transform .09s,background .15s}
+  .kbd-btn:active{transform:scale(.94)}
+  .kbd-btn svg{width:22px;height:22px}
+  .kbd-btn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+
+  /* переключатели */
+  .seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px}
+  .seg button{flex:1 1 auto;padding:10px 6px;border-radius:10px;font-weight:700;font-size:.84rem;color:var(--muted);
+    transition:background .15s,color .15s;white-space:nowrap}
+  .seg button.on{background:var(--surface2);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+  .seg.sm button{padding:7px 9px;font-size:.76rem}
+
+  /* клавиатура под трекпадом */
+  .kbd{margin-top:4px;animation:rise .25s ease}
+  .keys{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .keys .w2{grid-column:span 2}
+  .key{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-height:50px;
+    display:flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:.8rem;
+    transition:transform .09s,background .15s}
+  .key:active{transform:scale(.94);background:var(--surface2)}
+  .key svg{width:19px;height:19px;color:var(--ink)}
+  .key.muted{color:var(--muted)}
+
+  /* ввод текста */
+  .typer{display:flex;gap:9px}
+  .typer textarea{flex:1;min-width:0;background:var(--surface);color:var(--ink);border:1px solid var(--line);
+    border-radius:14px;padding:12px 14px;resize:none;height:50px;line-height:1.4;scrollbar-width:none}
+  .icon-btn{flex:0 0 auto;width:50px;height:50px;border-radius:14px;display:grid;place-items:center;
+    background:var(--accent);color:#0A1020;transition:transform .09s}
+  .icon-btn:active{transform:scale(.94)}
+  .icon-btn svg{width:20px;height:20px}
+
+  /* чипы и поля */
+  .chips{display:flex;flex-wrap:wrap;gap:9px}
+  .chips.grid3{display:grid;grid-template-columns:repeat(3,1fr)}
+  .chip{background:var(--surface);border:1px solid var(--line);color:var(--ink);font-weight:700;
+    font-size:.9rem;padding:11px 17px;border-radius:999px;transition:transform .09s;
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+  .chip svg{width:17px;height:17px}
+  .chip:active{transform:scale(.94)}
+  .chip.go{background:var(--accent);border-color:var(--accent);color:#0A1020}
+  .chip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+  .chip.sm{padding:8px 13px;font-size:.8rem}
+  .chip:disabled{opacity:.5}
+  .field{display:flex;gap:9px;margin-top:12px}
+  .field input,.field select{flex:1;min-width:0;background:var(--surface);color:var(--ink);
+    border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+  .field .chip{border-radius:14px;flex:0 0 auto}
+  .field .chip.fill{flex:1}
+
+  /* таймер */
+  .countdown{background:var(--surface);border:1px solid var(--power);border-radius:20px;padding:18px 20px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 0 32px -16px var(--power)}
+  .countdown .t{font-size:2.1rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .countdown .what{color:var(--muted);font-size:.82rem;font-weight:600}
+  .countdown button{background:var(--power-dim);color:var(--power);font-weight:700;padding:11px 18px;border-radius:12px}
+
+  .note{background:var(--surface);border:1px solid var(--warm);border-radius:16px;padding:14px 16px;
+    color:var(--muted);font-size:.86rem;line-height:1.5;font-weight:600}
+  .note b{color:var(--warm)}
+  .note.plain{border-color:var(--line)}
+
+  /* нет связи */
+  .banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;
+    background:var(--power-dim);border:1px solid rgba(255,90,96,.4);border-radius:16px;padding:12px 14px;
+    font-size:.84rem;font-weight:600;line-height:1.4;animation:rise .3s ease}
+  .banner b{display:block;color:var(--ink);font-size:.9rem}
+  .banner span{color:var(--muted)}
+  .banner button{background:var(--power);color:#fff;font-weight:700;padding:10px 14px;border-radius:11px;
+    white-space:nowrap;flex:0 0 auto}
+
+  /* буфер обмена */
+  .area{display:block;width:100%;background:var(--surface);color:var(--ink);border:1px solid var(--line);
+    border-radius:14px;padding:13px 14px;resize:vertical;min-height:96px;line-height:1.4}
+
+  /* слайдер громкости */
+  .slider{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px 18px 10px}
+  .slider .head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .slider .head .n{font-size:2rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .slider .head .n small{font-size:.9rem;color:var(--faint);font-weight:700}
+  .slider .head .k{color:var(--muted);font-size:.82rem;font-weight:600}
+  .track{position:relative;height:44px;display:flex;align-items:center;touch-action:none}
+  .track .rail{position:absolute;left:0;right:0;height:10px;border-radius:10px;background:var(--line)}
+  .track .fill{position:absolute;left:0;height:10px;border-radius:10px;
+    background:linear-gradient(90deg,var(--accent),var(--safe));transition:width .12s ease}
+  .track .knob{position:absolute;width:26px;height:26px;border-radius:50%;background:var(--ink);
+    transform:translateX(-50%);box-shadow:0 3px 10px rgba(0,0,0,.5);transition:transform .12s ease,left .12s ease}
+  .track.grab .knob{transform:translateX(-50%) scale(1.22);transition:none}
+  .track.grab .fill{transition:none}
+  .vol-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--line);margin:10px -18px -10px;
+    border-top:1px solid var(--line);border-radius:0 0 20px 20px;overflow:hidden}
+  .vol-row button{background:var(--surface);padding:13px 6px;display:flex;align-items:center;justify-content:center;
+    gap:7px;font-weight:700;font-size:.8rem;transition:background .12s}
+  .vol-row button:active{background:var(--surface2)}
+  .vol-row svg{width:19px;height:19px}
+
+  /* ночной режим */
+  .night{background:linear-gradient(150deg,#1a2240,#141b2e);border:1px solid #33406a;border-radius:22px;
+    padding:18px;position:relative;overflow:hidden}
+  .night::after{content:"";position:absolute;right:-30px;top:-40px;width:150px;height:150px;border-radius:50%;
+    background:radial-gradient(circle,rgba(91,141,239,.22),transparent 70%);pointer-events:none}
+  .night h3{font-size:1.05rem;font-weight:800;display:flex;align-items:center;gap:9px}
+  .night h3 svg{width:20px;height:20px;color:var(--accent)}
+  .night p{color:var(--muted);font-size:.84rem;line-height:1.5;margin:8px 0 14px;font-weight:600;position:relative}
+  .night .seg{position:relative;margin-bottom:12px;background:rgba(14,20,34,.5);border-color:#33406a}
+  .night .seg button.on{background:#2a3766}
+  .night .go{width:100%;background:var(--accent);color:#0A1020;font-weight:800;font-size:1rem;
+    padding:15px;border-radius:16px;transition:transform .09s;position:relative}
+  .night .go:active{transform:scale(.97)}
+
+  .ghost{display:block;margin:30px auto 0;color:var(--faint);font-weight:700;font-size:.84rem;padding:10px 14px}
+
+  /* навигация */
+  .nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;
+    padding:10px 12px calc(env(safe-area-inset-bottom,0px) + 8px);pointer-events:none;
+    background:linear-gradient(to top,var(--bg) 60%,rgba(14,20,34,0))}
+  .nav-inner{display:flex;gap:3px;background:var(--surface);border:1px solid var(--line);border-radius:999px;
+    padding:5px;box-shadow:var(--shadow);max-width:480px;width:100%;pointer-events:auto}
+  .nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px;
+    border-radius:999px;color:var(--muted);font-size:.66rem;font-weight:700;transition:color .15s,background .15s}
+  .nav button svg{width:21px;height:21px}
+  .nav button.active{color:var(--ink);background:var(--surface2)}
+  .nav button.active svg{color:var(--accent)}
+
+  /* вход */
+  .login{padding:20px;display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;justify-content:center;max-width:440px;margin:0 auto}
+  .login .logo{width:76px;height:76px;margin:0 auto 22px;display:block;border-radius:21px}
+  .login h1{font-size:1.6rem;font-weight:800;text-align:center;letter-spacing:-.02em}
+  .login p{color:var(--muted);line-height:1.55;text-align:center;margin:12px 0 22px;font-size:.94rem}
+  .login .field{flex-direction:column}
+  .login input{text-align:center}
+  .login .chip.go{padding:14px}
+  .err{color:var(--power);text-align:center;font-weight:600;font-size:.9rem;margin-bottom:10px}
+
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 98px);pointer-events:none;
+    transform:translateX(-50%);z-index:40;background:var(--ink);color:var(--bg);padding:12px 18px;
+    border-radius:14px;font-weight:700;font-size:.89rem;box-shadow:var(--shadow);text-align:center;
+    width:max-content;max-width:calc(100% - 36px);animation:tin .3s cubic-bezier(.2,.8,.2,1)}
+  .toast.bad{background:var(--power);color:#fff}
+  @keyframes tin{from{opacity:0;transform:translateX(-50%) translateY(14px)}}
+
+  /* совсем узкие телефоны (iPhone SE 1-го поколения и т. п.) */
+  @media (max-width:350px){
+    .app{padding-left:12px;padding-right:12px}
+    .gauges,.grid{gap:7px}
+    .gauge{padding:11px 9px}
+    .gauge .k{font-size:.66rem}
+    .vol-row{margin-left:-14px;margin-right:-14px}
+    .slider{padding-left:14px;padding-right:14px}
+  }
+  /* невысокие экраны: компактнее кнопка питания */
+  @media (max-height:700px){
+    .dial-wrap{margin-top:18px}
+    .dial{width:170px;height:170px}
+    .dial .glyph svg{width:56px;height:56px}
+  }
+  /* большие экраны: шире колонка */
+  @media (min-width:760px){
+    .app{max-width:640px}
+    .nav-inner{max-width:560px}
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- библиотеки отдаёт сам сервер (кэширует их с CDN), чтобы пульт работал без интернета -->
+<script src="vendor/react.js"></script>
+<script src="vendor/react-dom.js"></script>
+<script src="vendor/htm.js"></script>
+<script>
+const { useState, useEffect, useRef, useCallback } = React;
+const h = htm.bind(React.createElement);
+const sv = (d, extra) => h`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width=${extra||2} stroke-linecap="round" stroke-linejoin="round" dangerouslySetInnerHTML=${{__html:d}}></svg>`;
+
+const I = {
+  power:   sv('<path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/>', 2.2),
+  restart: sv('<path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/>'),
+  moon:    sv('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
+  lock:    sv('<rect x="4.5" y="11" width="15" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
+  logout:  sv('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>'),
+  display: sv('<rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>'),
+  volUp:   sv('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a3 3 0 0 1 0 6M18.5 6.5a7 7 0 0 1 0 11"/>'),
+  volDown: sv('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a3 3 0 0 1 0 6"/>'),
+  mute:    sv('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M22 9l-6 6M16 9l6 6"/>'),
+  play:    sv('<path d="M8 5l10 7-10 7z"/>'),
+  playPause: sv('<path d="M4 5l9 7-9 7z"/><path d="M16 5v14M20 5v14"/>'),
+  prev:    sv('<path d="M18 5L8 12l10 7zM6 5v14"/>'),
+  next:    sv('<path d="M6 5l10 7-10 7zM18 5v14"/>'),
+  back10:  sv('<path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/>'),
+  fwd10:   sv('<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>'),
+  sun:     sv('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  sunLow:  sv('<circle cx="12" cy="12" r="4"/><path d="M12 3v1M12 20v1M4.9 4.9l.7.7M18.4 18.4l.7.7M3 12h1M20 12h1"/>'),
+  trash:   sv('<path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/>'),
+  home:    sv('<path d="M3 11l9-8 9 8M5 10v10h14V10"/>'),
+  pad:     sv('<rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="M12 4.5v15"/>'),
+  film:    sv('<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="M7 4v16M17 4v16M2.5 12h19"/>'),
+  clock:   sv('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+  grid:    sv('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
+  link:    sv('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>'),
+  lclick:  sv('<rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 3v7H6"/>'),
+  rclick:  sv('<rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 3v7h6"/>'),
+  expand:  sv('<path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/>'),
+  esc:     sv('<path d="M18 6L6 18M6 6l12 12"/>'),
+  keyboard:sv('<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>'),
+  arrUp:   sv('<path d="M12 19V5M5 12l7-7 7 7"/>'),
+  arrDown: sv('<path d="M12 5v14M5 12l7 7 7-7"/>'),
+  arrLeft: sv('<path d="M19 12H5M12 5l-7 7 7 7"/>'),
+  arrRight:sv('<path d="M5 12h14M12 5l7 7-7 7"/>'),
+  chevUp:  sv('<path d="M6 15l6-6 6 6"/>'),
+  chevDown:sv('<path d="M6 9l6 6 6-6"/>'),
+  enter:   sv('<path d="M20 6v6a2 2 0 0 1-2 2H5"/><path d="M9 10l-4 4 4 4"/>'),
+  backsp:  sv('<path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="M17 9l-5 6M12 9l5 6"/>'),
+  tab:     sv('<path d="M3 12h14M13 7l5 5-5 5M21 5v14"/>'),
+  send:    sv('<path d="M21 3L10.5 13.5M21 3l-7 18-3.5-7.5L3 10z"/>'),
+  bed:     sv('<path d="M3 18v-7h18v7M3 18v2M21 18v2M3 11V7M7 11V9a2 2 0 0 1 2-2h9a3 3 0 0 1 3 3v2"/>'),
+  copy:    sv('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>'),
+  bolt:    sv('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'),
+  youtube: sv('<rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9.5l5 2.5-5 2.5z"/>'),
+  windows: sv('<rect x="3" y="4" width="13" height="10" rx="1.5"/><path d="M8 18h11a1.5 1.5 0 0 0 1.5-1.5V9"/>'),
+  desktop: sv('<rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4M7 13h10"/>'),
+  close:   sv('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8h18M10 12l4 4M14 12l-4 4"/>'),
+};
+
+/* ---------- сеть ---------- */
+function loadToken() {
+  const hash = location.hash.slice(1);
+  if (hash) { try { localStorage.setItem("pcr-token", hash); } catch {}
+    history.replaceState(null, "", location.pathname); return hash; }
+  try { return localStorage.getItem("pcr-token") || ""; } catch { return ""; }
+}
+// таймаут обязателен: уснувший ноутбук иначе держит запрос минутами
+async function api(token, method, path, data, ms = 6000) {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+  let r;
+  try {
+    r = await fetch(path, { method, signal: c.signal,
+      headers: { "Content-Type": "application/json", "X-Token": token },
+      body: data ? JSON.stringify(data) : undefined });
+  } catch { const e = new Error("Ноутбук не отвечает"); e.offline = true; throw e; }
+  finally { clearTimeout(t); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.error || "Ошибка " + r.status); e.status = r.status; throw e; }
+  return j;
+}
+// мышь и клавиши: короткий таймаут и без ожидания ответа — важна скорость, а не подтверждение
+function useInput(token, say) {
+  return useCallback((data) => {
+    const c = new AbortController(), t = setTimeout(() => c.abort(), 3000);
+    return fetch("/api/input", { method: "POST", keepalive: true, signal: c.signal,
+      headers: { "Content-Type": "application/json", "X-Token": token }, body: JSON.stringify(data) })
+      .then((r) => { if (r.status === 500) r.json().then((j) => say(j.error, true)); })
+      .catch(() => {}).finally(() => clearTimeout(t));
+  }, [token, say]);
+}
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+
+/* ---------- мелочи ---------- */
+const osName = { win32: "Windows", darwin: "macOS", linux: "Linux" };
+const uptime = (s) => { const d = s/86400|0, hr = s%86400/3600|0, m = s%3600/60|0;
+  return d ? `${d} д ${hr} ч` : hr ? `${hr} ч ${m} м` : `${m} мин`; };
+const clock = (ms) => { const s = Math.max(0, Math.round(ms/1000)), hr = s/3600|0, m = s%3600/60|0, x = s%60,
+  p = (n) => String(n).padStart(2,"0"); return (hr?hr+":":"") + p(m) + ":" + p(x); };
+const dur = (m) => m < 60 ? m + " мин" : (m / 60) + " ч";
+const ACT = { shutdown: "Выключение", restart: "Перезагрузка", sleep: "Сон" };
+const buzz = (ms=16) => { if (navigator.vibrate) navigator.vibrate(ms); };
+
+function useHold(onDone, duration=1300) {
+  const [p, setP] = useState(0);
+  const raf = useRef(0);
+  const stop = useCallback(() => { cancelAnimationFrame(raf.current); setP(0); }, []);
+  const begin = useCallback((e) => {
+    if (e.button > 0) return;
+    buzz(10);
+    const t0 = performance.now();
+    const tick = (t) => {
+      const v = Math.min(1, (t - t0) / duration); setP(v);
+      if (v >= 1) { buzz(60); onDone(); setTimeout(() => setP(0), 350); }
+      else raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+  }, [onDone, duration]);
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  // начали листать страницу с этой кнопки — браузер присылает pointercancel, и удержание сбрасывается
+  return [p, { onPointerDown: begin, onPointerUp: stop, onPointerLeave: stop,
+    onPointerCancel: stop, onContextMenu: (e) => e.preventDefault() }];
+}
+
+function PowerDial({ onFire }) {
+  const [p, hold] = useHold(onFire, 1500);
+  const R = 95, C = 2 * Math.PI * R;
+  return h`<button class=${"dial" + (p ? " armed" : "")} aria-label="Выключить, удерживайте" ...${hold}>
+    <svg class="svg" viewBox="0 0 210 210">
+      <circle cx="105" cy="105" r=${R} fill="none" stroke="var(--line)" stroke-width="5"/>
+      <circle cx="105" cy="105" r=${R} fill="none" stroke="var(--power)" stroke-width="5" stroke-linecap="round"
+        stroke-dasharray=${C} stroke-dashoffset=${C*(1-p)} style=${{transition:p?"none":"stroke-dashoffset .35s"}}/>
+    </svg><span class="glyph">${I.power}</span></button>`;
+}
+function HoldTile({ icon, label, sub, danger, warm, small, onFire }) {
+  const [p, hold] = useHold(onFire);
+  return h`<button class=${"tile"+(danger?" danger":"")+(warm?" warm":"")+(small?" small":"")} ...${hold}>
+    ${icon}<span class="lbl">${label}</span>${sub && h`<span class="sub">${sub}</span>`}
+    <span class="hold" style=${{width:(p*100)+"%",transition:p?"none":"width .3s"}}></span></button>`;
+}
+function Tile({ icon, label, sub, danger, warm, accent, big, small, aria, onClick }) {
+  return h`<button class=${"tile"+(danger?" danger":"")+(warm?" warm":"")+(accent?" accent":"")+(big?" big":"")+(small?" small":"")}
+    aria-label=${aria || undefined}
+    onClick=${() => { buzz(); onClick(); }}>${icon}${label && h`<span class="lbl">${label}</span>`}
+    ${sub && h`<span class="sub">${sub}</span>`}</button>`;
+}
+function Key({ icon, label, aria, muted, wide, onClick }) {
+  return h`<button class=${"key"+(muted?" muted":"")+(wide?" w2":"")} aria-label=${aria || label}
+    onClick=${() => { buzz(10); onClick(); }}>${icon}${label && h`<span>${label}</span>`}</button>`;
+}
+function Seg({ value, options, onChange, small, label }) {
+  return h`<div class=${"seg"+(small?" sm":"")} role="radiogroup" aria-label=${label}>
+    ${options.map(([v, l]) => h`<button key=${v} role="radio" aria-checked=${value === v}
+      class=${value === v ? "on" : ""} onClick=${() => { buzz(8); onChange(v); }}>${l}</button>`)}
+  </div>`;
+}
+function Section({ icon, title, note }) {
+  return h`<div class="section-label">${icon} ${title}${note && h`<span>${note}</span>`}</div>`;
+}
+
+/* ---------- трекпад ---------- */
+const SCROLL_K = 3;        // пикселей пальца → единиц колеса (120 = один щелчок)
+const SPEEDS = [[1.1, "Медленно"], [1.7, "Обычно"], [2.6, "Быстро"]];
+
+function Trackpad({ token, say, info }) {
+  const padRef = useRef(null), kbdRef = useRef(null);
+  const [used, setUsed] = useState(false);
+  const [ripples, setRipples] = useState([]);
+  const [dragging, setDragging] = useState(false);
+  const [scrolling, setScrolling] = useState(false);
+  const [kbd, setKbd] = useState(() => store.get("pcr-kbd", "0") === "1");
+  const [speed, setSpeed] = useState(() => Number(store.get("pcr-speed", 1.7)) || 1.7);
+  const st = useRef({ pts: new Map(), moved: 0, startT: 0, mode: null, axis: null, sum: { x: 0, y: 0 },
+    acc: { x: 0, y: 0 }, sc: { x: 0, y: 0 }, vel: { x: 0, y: 0, t: 0 }, glide: 0, maxPts: 0,
+    lastTap: 0, dragArm: false, dragging: false, busy: false, sBusy: false });
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
+  const post = useInput(token, say);
+
+  // копим смещение и отправляем пачками, но не больше одного запроса за раз:
+  // на слабом Wi-Fi запросы не копятся в очередь, и курсор не «догоняет» палец
+  const flush = useCallback(() => {
+    const s = st.current, a = s.acc, c = s.sc;
+    if (!s.busy && (Math.abs(a.x) >= 1 || Math.abs(a.y) >= 1)) {
+      const dx = Math.round(a.x), dy = Math.round(a.y);
+      a.x -= dx; a.y -= dy;   // дробный остаток не теряем
+      s.busy = true;
+      post({ op: "move", dx, dy }).finally(() => { s.busy = false; });
+    }
+    if (!s.sBusy && (Math.abs(c.x) >= 6 || Math.abs(c.y) >= 6)) {
+      const jobs = [];
+      if (Math.abs(c.y) >= 6) { const y = Math.round(c.y); c.y -= y; jobs.push(post({ op: "scroll", amount: y })); }
+      if (Math.abs(c.x) >= 6) { const x = Math.round(c.x); c.x -= x; jobs.push(post({ op: "hscroll", amount: x })); }
+      s.sBusy = true;
+      Promise.all(jobs).finally(() => { s.sBusy = false; });
+    }
+  }, [post]);
+
+  useEffect(() => { const i = setInterval(flush, 16); return () => clearInterval(i); }, [flush]);
+
+  // «естественная» прокрутка, как на телефоне: тянем содержимое за пальцем
+  const addScroll = (dx, dy) => { const c = st.current.sc; c.y += dy * SCROLL_K; c.x -= dx * SCROLL_K; };
+
+  // после быстрого жеста прокрутка ещё немного катится и плавно останавливается
+  const glide = () => {
+    const s = st.current;
+    let { x, y, t } = s.vel, t0 = performance.now();
+    if (t0 - t > 90 || Math.hypot(x, y) < 0.3) return setScrolling(false);
+    const step = (now) => {
+      const dt = Math.min(40, now - t0); t0 = now;
+      const k = Math.pow(0.995, dt); x *= k; y *= k;
+      addScroll(x * dt, y * dt);
+      if (Math.hypot(x, y) > 0.04) s.glide = requestAnimationFrame(step);
+      else setScrolling(false);
+    };
+    s.glide = requestAnimationFrame(step);
+  };
+
+  const endDrag = () => {
+    const s = st.current;
+    if (!s.dragging) return;
+    s.dragging = false; setDragging(false);
+    setTimeout(() => post({ op: "up" }), 40);   // после последнего движения
+  };
+  useEffect(() => () => { const s = st.current;
+    cancelAnimationFrame(s.glide); if (s.dragging) post({ op: "up" }); }, [post]);
+
+  const ripple = (x, y) => {
+    const id = Math.random();
+    setRipples((r) => [...r, { id, x, y }]);
+    setTimeout(() => setRipples((r) => r.filter((v) => v.id !== id)), 520);
+  };
+
+  const onDown = (e) => {
+    e.preventDefault();
+    const s = st.current;
+    cancelAnimationFrame(s.glide);
+    s.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (s.pts.size === 1) {
+      s.moved = 0; s.startT = performance.now(); s.maxPts = 1; s.axis = null; s.sum = { x: 0, y: 0 };
+      s.vel = { x: 0, y: 0, t: s.startT };
+      s.mode = e.target.closest(".strip") ? "strip" : "move";
+      if (s.mode === "strip") { setScrolling(true); buzz(6); }
+      // касание сразу после касания и повести — перетаскивание, как на тачпаде ноутбука
+      s.dragArm = s.mode === "move" && s.startT - s.lastTap < 300;
+    } else {
+      s.maxPts = Math.max(s.maxPts, s.pts.size);
+      s.dragArm = false;
+      if (!s.dragging && s.mode !== "scroll") { s.mode = "scroll"; s.axis = null; s.sum = { x: 0, y: 0 }; setScrolling(true); }
+    }
+    setUsed(true);
+    padRef.current.setPointerCapture(e.pointerId);
+  };
+
+  const onMove = (e) => {
+    const s = st.current, p = s.pts.get(e.pointerId);
+    if (!p) return;
+    e.preventDefault();
+    // сдвиг считаем по каждому пальцу отдельно — иначе два пальца дают рывки
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    p.x = e.clientX; p.y = e.clientY;
+    s.moved += Math.abs(dx) + Math.abs(dy);
+
+    if (s.mode === "scroll" || s.mode === "strip") {
+      const n = s.mode === "scroll" ? s.pts.size : 1;
+      let mx = s.mode === "strip" ? 0 : dx / n, my = dy / n;
+      if (s.mode === "scroll") {
+        // первые миллиметры решают направление: вверх-вниз или вбок
+        if (!s.axis) {
+          s.sum.x += Math.abs(mx); s.sum.y += Math.abs(my);
+          if (s.sum.x + s.sum.y < 10) return;
+          s.axis = s.sum.x > s.sum.y * 1.3 ? "x" : "y";
+        }
+        if (s.axis === "x") my = 0; else mx = 0;
+      }
+      addScroll(mx, my);
+      const now = performance.now(), dt = Math.max(1, now - s.vel.t);
+      s.vel = { x: .6 * mx / dt + .4 * s.vel.x, y: .6 * my / dt + .4 * s.vel.y, t: now };
+      return;
+    }
+
+    if (s.dragArm && !s.dragging && s.moved > 6) {
+      s.dragging = true; setDragging(true); buzz(25);
+      flush(); post({ op: "down" });
+    }
+    // ускорение: быстрый жест двигает курсор дальше
+    const accel = Math.min(2.6, 1 + Math.hypot(dx, dy) / 14);
+    s.acc.x += dx * speedRef.current * accel;
+    s.acc.y += dy * speedRef.current * accel;
+  };
+
+  const onUp = (e) => {
+    const s = st.current;
+    if (!s.pts.has(e.pointerId)) return;
+    s.pts.delete(e.pointerId);
+    if (s.pts.size) return;
+    const now = performance.now(), quick = now - s.startT < 280;
+    const r = padRef.current.getBoundingClientRect();
+    if (s.dragging) { endDrag(); s.lastTap = 0; }
+    else if (s.mode === "scroll") {
+      if (quick && s.maxPts >= 2 && s.moved < 24) {        // касание двумя пальцами — правая кнопка
+        ripple(e.clientX - r.left, e.clientY - r.top); buzz(14);
+        post({ op: "rclick" }); setScrolling(false);
+      } else glide();
+      s.lastTap = 0;
+    }
+    else if (s.mode === "strip") glide();
+    else if (quick && s.moved < 12) {
+      ripple(e.clientX - r.left, e.clientY - r.top); buzz(14);
+      post({ op: "click" });
+      s.lastTap = now;
+    }
+    s.mode = null; s.dragArm = false;
+  };
+
+  const pickSpeed = (v) => { setSpeed(v); store.set("pcr-speed", v); };
+  const toggleKbd = () => {
+    buzz(8); const v = !kbd; setKbd(v); store.set("pcr-kbd", v ? "1" : "0");
+    if (v) setTimeout(() => kbdRef.current && kbdRef.current.scrollIntoView({ behavior: "smooth", block: "end" }), 60);
+  };
+  const key = (k) => post({ op: "key", key: k });
+  const combo = (k) => post({ op: "combo", key: k });
+
+  if (info && info.input === false) return h`<div class="page" style=${{marginTop:"16px"}}>
+    <div class="note">Трекпад не работает: на ноутбуке не найден <b>${info.inputNeeds}</b>.
+      Установите его и перезапустите сервер — тогда появится управление курсором и клавиатурой.</div>
+  </div>`;
+
+  return h`<div class="page fill">
+    <div ref=${padRef} class=${"pad"+(used?" used":"")+(dragging?" dragging":"")}
+      onPointerDown=${onDown} onPointerMove=${onMove} onPointerUp=${onUp} onPointerCancel=${onUp}
+      onContextMenu=${(e) => e.preventDefault()}>
+      <div class="mesh"></div>
+      <div class="tip"><div><b>Водите пальцем</b> — курсор едет<br/>касание — клик<br/>
+        <b>двумя пальцами</b> — прокрутка<br/>касание двумя — правая кнопка<br/>
+        двойное касание и вести — перетащить<br/><b>полоса справа</b> — листать одним пальцем</div></div>
+      <div class=${"strip"+(scrolling?" on":"")} aria-hidden="true">${I.chevUp}<div class="rail"></div>${I.chevDown}</div>
+      ${ripples.map((r) => h`<span class="ripple" key=${r.id} style=${{left:r.x+"px",top:r.y+"px"}}></span>`)}
+    </div>
+    <div class="pad-btns">
+      <button class="pad-btn" onClick=${() => { buzz(); post({op:"click"}); }}
+        onDoubleClick=${(e) => e.preventDefault()}>${I.lclick} Левая</button>
+      <button class="pad-btn" onClick=${() => { buzz(); post({op:"rclick"}); }}>${I.rclick} Правая</button>
+    </div>
+    <div class="pad-bar">
+      <button class=${"kbd-btn"+(kbd?" on":"")} aria-expanded=${kbd}
+        aria-label=${kbd ? "Скрыть клавиатуру" : "Показать клавиатуру"} onClick=${toggleKbd}>${I.keyboard}</button>
+      <${Seg} small label="Скорость курсора" value=${speed} onChange=${pickSpeed}
+        options=${SPEEDS.map(([v, l]) => [v, l])}/>
+    </div>
+
+    ${kbd && h`<div class="kbd" ref=${kbdRef}>
+      <${Section} icon=${I.keyboard} title="Напечатать" note="поиск, пароли, адреса"/>
+      <${Typer} post=${post} say=${say}/>
+      <div class="keys" style=${{marginTop:"10px"}}>
+        <${Key} label="Esc" muted onClick=${() => key("esc")}/>
+        <${Key} label="Стр ↑" aria="Страница вверх" muted onClick=${() => key("pgup")}/>
+        <${Key} icon=${I.arrUp} aria="Вверх" onClick=${() => key("up")}/>
+        <${Key} label="Стр ↓" aria="Страница вниз" muted onClick=${() => key("pgdn")}/>
+        <${Key} icon=${I.tab} aria="Таб" onClick=${() => key("tab")}/>
+        <${Key} icon=${I.arrLeft} aria="Влево" onClick=${() => key("left")}/>
+        <${Key} icon=${I.arrDown} aria="Вниз" onClick=${() => key("down")}/>
+        <${Key} icon=${I.arrRight} aria="Вправо" onClick=${() => key("right")}/>
+        <${Key} wide icon=${I.backsp} label="Стереть" onClick=${() => key("back")}/>
+        <${Key} wide icon=${I.enter} label="Ввод" onClick=${() => key("enter")}/>
+      </div>
+      <${Section} icon=${I.windows} title="Окна"/>
+      <div class="grid">
+        <${Tile} small icon=${I.windows} label="Переключить" onClick=${() => combo("switch")}/>
+        <${Tile} small icon=${I.desktop} label="Рабочий стол" onClick=${() => combo("desktop")}/>
+        <${HoldTile} small danger icon=${I.close} label="Закрыть" sub="держать" onFire=${() => combo("close")}/>
+      </div>
+    </div>`}
+  </div>`;
+}
+
+function Typer({ post, say }) {
+  const [text, setText] = useState("");
+  const send = () => {
+    if (!text.trim()) return;
+    buzz(); post({ op: "type", text }); say("Напечатано на ноутбуке"); setText("");
+  };
+  return h`<div class="typer">
+    <textarea placeholder="Текст для ноутбука…" value=${text} autocapitalize="off" autocorrect="off"
+      enterkeyhint="send" onInput=${(e) => setText(e.target.value)}
+      onKeyDown=${(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}></textarea>
+    <button class="icon-btn" aria-label="Напечатать" onClick=${send}>${I.send}</button>
+  </div>`;
+}
+
+/* ---------- слайдер громкости ---------- */
+function VolumeSlider({ token, info, handle, act }) {
+  const [local, setLocal] = useState(null);     // пока тянут палец — своё значение
+  const [grab, setGrab] = useState(false);
+  const railRef = useRef(null);
+  const sendT = useRef(0), releaseT = useRef(0);
+  const real = info && typeof info.volume === "number" ? info.volume : null;
+  const value = local !== null ? local : (real !== null ? real : 0);
+  // отпускаем своё значение, только когда сервер его подтвердил — иначе ползунок прыгает назад
+  useEffect(() => { if (!grab && local !== null && real === local) setLocal(null); }, [real, local, grab]);
+  useEffect(() => () => { clearTimeout(sendT.current); clearTimeout(releaseT.current); }, []);
+
+  const push = useCallback((v) => {
+    clearTimeout(sendT.current);
+    sendT.current = setTimeout(() => {
+      api(token, "POST", "/api/volume", { value: v }).catch(handle);
+    }, 90);
+  }, [token, handle]);
+
+  const pick = (e) => {
+    const r = railRef.current.getBoundingClientRect();
+    const v = Math.round(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * 100);
+    setLocal(v); push(v);
+    return v;
+  };
+  const down = (e) => { e.preventDefault(); clearTimeout(releaseT.current);
+    setGrab(true); railRef.current.setPointerCapture(e.pointerId);
+    const v = pick(e); buzz(8); return v; };
+  const move = (e) => { if (!grab) return; e.preventDefault();
+    const before = value; const v = pick(e); if (Math.abs(v - before) >= 5) buzz(4); };
+  const up = () => { if (!grab) return; setGrab(false); buzz(12);
+    releaseT.current = setTimeout(() => setLocal(null), 8000); };
+
+  const buttons = h`<div class="vol-row">
+    <button onClick=${() => { buzz(); act("volDown"); }}>${I.volDown} Тише</button>
+    <button onClick=${() => { buzz(); act("mute"); }}>${I.mute} Без звука</button>
+    <button onClick=${() => { buzz(); act("volUp"); }}>${I.volUp} Громче</button>
+  </div>`;
+
+  if (real === null) return h`<div class="slider">
+    <div class="head"><div class="k">Точную громкость прочитать не удалось — работают кнопки</div></div>
+    ${buttons}</div>`;
+
+  return h`<div class="slider">
+    <div class="head">
+      <div class="n">${value}<small>%</small></div>
+      <div class="k">${value === 0 ? "тишина" : value < 25 ? "тихо" : value < 65 ? "нормально" : "громко"}</div>
+    </div>
+    <div ref=${railRef} class=${"track" + (grab ? " grab" : "")} role="slider" aria-label="Громкость"
+      aria-valuemin="0" aria-valuemax="100" aria-valuenow=${value}
+      onPointerDown=${down} onPointerMove=${move} onPointerUp=${up} onPointerCancel=${up}>
+      <div class="rail"></div>
+      <div class="fill" style=${{ width: value + "%" }}></div>
+      <div class="knob" style=${{ left: value + "%" }}></div>
+    </div>
+    ${buttons}
+  </div>`;
+}
+
+/* ---------- ночной режим ---------- */
+function NightCard({ token, say, handle, info }) {
+  const [mins, setMins] = useState((info && info.night && info.night.minutes) || 45);
+  const go = () => { buzz(40); api(token, "POST", "/api/night", { minutes: mins })
+    .then(() => say(`Спокойной ночи — усну через ${mins} мин`)).catch(handle); };
+  const opts = [30, 45, 60, 90];
+  return h`<div class="night">
+    <h3>${I.bed} Уже сплю</h3>
+    <p>Приглушу яркость, убавлю звук и усыплю ноутбук через выбранное время.</p>
+    <${Seg} label="Через сколько уснуть" value=${mins} onChange=${setMins}
+      options=${(opts.includes(mins) ? opts : [...opts, mins].sort((a, b) => a - b)).map((m) => [m, dur(m)])}/>
+    <button class="go" onClick=${go}>Спокойной ночи</button>
+  </div>`;
+}
+
+/* ---------- вкладки ---------- */
+function PowerPage({ act }) {
+  return h`<div class="page">
+    <div class="dial-wrap"><${PowerDial} onFire=${() => act("shutdown","Выключаю ноутбук")}/></div>
+    <div class="hint">Удерживайте, чтобы выключить</div>
+
+    <${Section} icon=${I.bolt} title="Быстро" note="одно касание"/>
+    <div class="grid">
+      <${Tile} icon=${I.moon} label="Сон" accent onClick=${() => act("sleep","Отправил в сон")}/>
+      <${Tile} icon=${I.lock} label="Блокировка" onClick=${() => act("lock","Экран заблокирован")}/>
+      <${Tile} icon=${I.display} label="Погасить экран" onClick=${() => act("screenOff","Экран выключен")}/>
+    </div>
+
+    <${Section} icon=${I.power} title="Осторожно" note="удерживайте кнопку"/>
+    <div class="grid">
+      <${HoldTile} icon=${I.restart} label="Перезагрузка" danger onFire=${() => act("restart","Перезагружаю")}/>
+      <${HoldTile} icon=${I.logout} label="Выйти" warm onFire=${() => act("logoff","Выхожу из системы")}/>
+      <${HoldTile} icon=${I.trash} label="Очистить корзину" warm onFire=${() => act("emptyTrash","Корзина очищена")}/>
+    </div>
+  </div>`;
+}
+
+function MediaPage({ act, token, say, open, info, handle }) {
+  const post = useInput(token, say);
+  const key = (k) => post({ op: "key", key: k });
+  return h`<div class="page">
+    <${Section} icon=${I.volUp} title="Громкость"/>
+    <${VolumeSlider} token=${token} info=${info} handle=${handle} act=${act}/>
+
+    <${Section} icon=${I.play} title="Видео" note="YouTube, Netflix, плеер"/>
+    <div class="grid">
+      <${Tile} icon=${I.back10} label="Назад" sub="←" onClick=${() => key("left")}/>
+      <${Tile} big icon=${I.playPause} label="Пауза" warm onClick=${() => key("space")}/>
+      <${Tile} icon=${I.fwd10} label="Вперёд" sub="→" onClick=${() => key("right")}/>
+    </div>
+    <div class="grid">
+      <${Tile} small icon=${I.expand} label="Весь экран" onClick=${() => key("f")}/>
+      <${Tile} small icon=${I.mute} label="Звук видео" onClick=${() => key("m")}/>
+      <${Tile} small icon=${I.esc} label="Выйти" sub="Esc" onClick=${() => key("esc")}/>
+    </div>
+
+    <${Section} icon=${I.next} title="Музыка" note="Spotify, плеер"/>
+    <div class="grid">
+      <${Tile} small icon=${I.prev} label="Предыдущий" onClick=${() => act("prev")}/>
+      <${Tile} small icon=${I.playPause} label="Играть" onClick=${() => act("playPause")}/>
+      <${Tile} small icon=${I.next} label="Следующий" onClick=${() => act("next")}/>
+    </div>
+
+    <${Section} icon=${I.sun} title="Яркость экрана"/>
+    <div class="grid two">
+      <${Tile} small icon=${I.sunLow} label="Темнее" onClick=${() => act("brightDown")}/>
+      <${Tile} small icon=${I.sun} label="Ярче" onClick=${() => act("brightUp")}/>
+    </div>
+
+    <${Section} icon=${I.youtube} title="Что посмотрим"/>
+    <div class="grid">
+      <${Tile} small icon=${I.youtube} label="YouTube" onClick=${() => open("https://youtube.com")}/>
+      <${Tile} small icon=${I.film} label="Netflix" onClick=${() => open("https://netflix.com")}/>
+      <${Tile} small icon=${I.play} label="Twitch" onClick=${() => open("https://twitch.tv")}/>
+    </div>
+  </div>`;
+}
+
+function TimerPage({ token, info, setInfo, say, handle }) {
+  const [sel, setSel] = useState("shutdown");
+  const [mins, setMins] = useState("");
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, []);
+  const start = (m) => { if (!(m > 0)) return say("Укажите минуты", true);
+    buzz(); api(token,"POST","/api/timer",{action:sel,minutes:m})
+    .then((d) => { setInfo(d); setMins(""); say(`${ACT[sel]} через ${dur(m)}`); }).catch(handle); };
+  const cancel = () => { buzz(); api(token,"DELETE","/api/timer")
+    .then((d) => { setInfo(d); say("Таймер отменён"); }).catch(handle); };
+  const t = info && info.timer;
+  return h`<div class="page">
+    <${Section} icon=${I.clock} title="Таймер" note="уснуть под сериал"/>
+    ${t ? h`<div class="countdown">
+      <div><div class="what">${ACT[t.action]} через</div><div class="t">${clock(t.at-now)}</div></div>
+      <button onClick=${cancel}>Отменить</button></div>`
+    : h`<div>
+      <${Seg} label="Что сделать" value=${sel} onChange=${setSel}
+        options=${[["shutdown","Выключить"],["sleep","Сон"],["restart","Перезагрузить"]]}/>
+      <div class="chips grid3" style=${{marginTop:"12px"}}>
+        ${[15,30,45,60,90,120].map((m) => h`<button class="chip" key=${m} onClick=${() => start(m)}>${dur(m)}</button>`)}
+      </div>
+      <div class="field">
+        <input type="number" inputmode="numeric" min="1" placeholder="Своё время, мин" value=${mins}
+          onInput=${(e) => setMins(e.target.value)} onKeyDown=${(e) => e.key === "Enter" && start(Number(mins))}/>
+        <button class="chip go" onClick=${() => start(Number(mins))}>Старт</button>
+      </div>
+    </div>`}
+
+    <div style=${{marginTop:"26px"}}><${NightCard} token=${token} say=${say} handle=${handle} info=${info}/></div>
+  </div>`;
+}
+
+// по http (а пульт открыт именно так) navigator.clipboard недоступен — есть запасной путь
+function copyToPhone(text, el) {
+  if (navigator.clipboard && window.isSecureContext)
+    return navigator.clipboard.writeText(text).then(() => true, () => false);
+  try { el.focus(); el.select(); return Promise.resolve(document.execCommand("copy")); }
+  catch { return Promise.resolve(false); }
+}
+
+function Clipboard({ token, info, say, handle }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const ref = useRef(null);
+  if (info && info.clipboard === false) return h`<div class="note">
+    Для общего буфера на ноутбуке нужен <b>xclip</b>. Установите его и перезапустите сервер.</div>`;
+
+  const pull = () => {
+    buzz(); setBusy(true);
+    api(token, "GET", "/api/clipboard").then((d) => {
+      setText(d.text || "");
+      if (!d.text) return say("Буфер ноутбука пуст");
+      // ждём, пока текст окажется в поле, и копируем его на телефон
+      setTimeout(() => copyToPhone(d.text, ref.current).then((ok) =>
+        say(ok ? "Скопировано с ноутбука" : "Текст ниже — выделите и скопируйте")), 0);
+    }).catch(handle).finally(() => setBusy(false));
+  };
+  const push = () => {
+    if (!text) return say("Вставьте текст в поле", true);
+    buzz(); setBusy(true);
+    api(token, "POST", "/api/clipboard", { text })
+      .then(() => say("Теперь в буфере ноутбука — вставляйте Ctrl+V")).catch(handle)
+      .finally(() => setBusy(false));
+  };
+  return h`<div>
+    <textarea ref=${ref} class="area" placeholder="Текст, который нужно перекинуть…" value=${text}
+      autocapitalize="off" autocorrect="off" onInput=${(e) => setText(e.target.value)}></textarea>
+    <div class="field">
+      <button class="chip fill" disabled=${busy} onClick=${pull}>${I.arrDown} С ноутбука</button>
+      <button class="chip go fill" disabled=${busy} onClick=${push}>${I.arrUp} На ноутбук</button>
+    </div>
+  </div>`;
+}
+
+function ToolsPage({ token, info, say, handle, open, onForget }) {
+  const [link, setLink] = useState("");
+  const custom = (info && info.custom) || [];
+  const go = () => { if (link) { open(link); setLink(""); } };
+  return h`<div class="page">
+    <${Section} icon=${I.link} title="Открыть ссылку на ноутбуке"/>
+    <div class="field" style=${{marginTop:0}}>
+      <input type="url" inputmode="url" enterkeyhint="go" placeholder="youtube.com/…" value=${link} autocapitalize="off"
+        onInput=${(e) => setLink(e.target.value.trim())} onKeyDown=${(e) => e.key === "Enter" && go()}/>
+      <button class="chip go" onClick=${go}>Открыть</button>
+    </div>
+
+    <${Section} icon=${I.copy} title="Общий буфер" note="телефон ⇄ ноутбук"/>
+    <${Clipboard} token=${token} info=${info} say=${say} handle=${handle}/>
+
+    <${Section} icon=${I.grid} title="Свои команды"/>
+    ${custom.length > 0
+      ? h`<div class="grid two">
+          ${custom.map((c) => h`<${Tile} small key=${c.id} icon=${I.grid} label=${c.label}
+            onClick=${() => api(token,"POST","/api/custom",{id:c.id})
+              .then(() => say("Запущено: " + c.label)).catch(handle)}/>`)}
+        </div>`
+      : h`<div class="note plain">Добавьте их в <b>config.json</b> рядом с сервером — и они появятся здесь кнопками.</div>`}
+
+    <button class="ghost" onClick=${onForget}>Отключить этот телефон</button>
+  </div>`;
+}
+
+function Login({ onSave, error }) {
+  const [v, setV] = useState("");
+  return h`<div class="login">
+    <img class="logo" src="icon.png" alt=""/>
+    <h1>Пульт ноутбука</h1>
+    <p>Откройте ссылку, которую сервер напечатал при запуске, или введите токен вручную.</p>
+    ${error && h`<div class="err">${error}</div>`}
+    <div class="field">
+      <input placeholder="Токен" value=${v} autocapitalize="off" autocomplete="off"
+        onInput=${(e) => setV(e.target.value.trim())} onKeyDown=${(e) => e.key === "Enter" && v && onSave(v)}/>
+      <button class="chip go" onClick=${() => v && onSave(v)}>Подключиться</button>
+    </div>
+  </div>`;
+}
+
+/* ---------- корень ---------- */
+const TABS = [
+  { id:"power", label:"Питание", icon:I.home },
+  { id:"pad",   label:"Трекпад", icon:I.pad },
+  { id:"media", label:"Медиа",   icon:I.film },
+  { id:"timer", label:"Таймер",  icon:I.clock },
+  { id:"tools", label:"Ещё",     icon:I.grid },
+];
+
+function App() {
+  const [token, setToken] = useState(loadToken);
+  const [info, setInfo] = useState(null);
+  const [online, setOnline] = useState(null);   // null — ещё не знаем
+  const misses = useRef(0), ver = useRef(null);
+  const [authErr, setAuthErr] = useState("");
+  const [tab, setTab] = useState(() => { const t = store.get("pcr-tab", "power");
+    return TABS.some((x) => x.id === t) ? t : "power"; });
+  const [toast, setToast] = useState(null);
+  const tt = useRef(0);
+
+  const say = useCallback((text, bad) => {
+    clearTimeout(tt.current); setToast({ text, bad });
+    tt.current = setTimeout(() => setToast(null), 2600);
+  }, []);
+  const forget = useCallback((msg) => {
+    setAuthErr(msg || ""); setToken(""); setInfo(null);
+    try { localStorage.removeItem("pcr-token"); } catch {}
+  }, []);
+  const handle = useCallback((e) => {
+    if (e.status === 401) forget("Токен не подошёл.");
+    else say(e.message, true);
+  }, [say, forget]);
+
+  const refresh = useCallback(() => {
+    if (!token) return;
+    api(token,"GET","/api/info",null,4000).then((d) => {
+      // ноутбук обновился — подтягиваем новый интерфейс
+      if (ver.current && d.version && d.version !== ver.current) return location.reload();
+      ver.current = d.version; misses.current = 0; setInfo(d); setOnline(true); })
+      .catch((e) => {
+        if (e.status === 401) return handle(e);
+        // один потерянный ответ на Wi-Fi — ещё не обрыв
+        if (++misses.current >= 2 || !e.offline) setOnline(false);
+      });
+  }, [token, handle]);
+  // пока вкладка скрыта — не опрашиваем; вернулись — сразу обновляем
+  useEffect(() => {
+    refresh();
+    const i = setInterval(() => { if (!document.hidden) refresh(); }, 3000);
+    const vis = () => { if (!document.hidden) refresh(); };
+    document.addEventListener("visibilitychange", vis);
+    window.addEventListener("online", vis);
+    return () => { clearInterval(i); document.removeEventListener("visibilitychange", vis);
+      window.removeEventListener("online", vis); };
+  }, [refresh]);
+
+  const act = (action, done) => api(token,"POST","/api/action",{action})
+    .then(() => done && say(done)).catch(handle);
+  const open = (raw) => { const url = /^https?:\/\//i.test(raw) ? raw : "https://" + raw; buzz();
+    api(token,"POST","/api/open",{url}).then(() => say("Открыто на ноутбуке")).catch(handle); };
+  const go = (id) => {
+    buzz(8);
+    if (id === tab) return window.scrollTo({ top: 0, behavior: "smooth" });
+    setTab(id); store.set("pcr-tab", id); window.scrollTo(0, 0);
+  };
+
+  if (!token) return h`<${Login} error=${authErr} onSave=${(t) => {
+    store.set("pcr-token", t); setAuthErr(""); setToken(t); }}/>`;
+
+  const mem = info ? Math.round(info.memUsed / info.memTotal * 100) : 0;
+  const bat = info && info.battery;
+  const batColor = !bat ? "" : bat.level <= 20 && !bat.charging ? "var(--power)" : bat.charging ? "var(--warm)" : "var(--safe)";
+
+  return h`<div class="app">
+    <div class="top">
+      <div class="host">
+        <div class="name">${info ? info.hostname : "Подключение…"}</div>
+        <div class="os">${info ? (osName[info.platform] || info.platform) + " · в работе " + uptime(info.uptimeSec) : ""}</div>
+      </div>
+      <div class="live"><span class=${"pulse"+(online?" on":"")}></span>
+        ${online ? "В сети" : online === null ? "Связь…" : "Нет связи"}
+        ${bat && tab !== "power" && h`<span class="bat" style=${{color:batColor}}>${bat.level}%</span>`}</div>
+    </div>
+
+    ${online === false && h`<div class="banner" role="alert">
+      <div><b>Ноутбук не отвечает</b><span>Спит, выключен или в другой сети. Переподключаюсь сам.</span></div>
+      <button onClick=${() => { buzz(); refresh(); }}>Повторить</button>
+    </div>`}
+
+    ${info && tab === "power" && h`<div class="gauges">
+      <div class="gauge"><div class="k">Процессор</div><div class="v">${info.cpu}<small>%</small></div>
+        <div class="bar"><i style=${{width:info.cpu+"%"}}></i></div></div>
+      <div class="gauge"><div class="k">Память</div><div class="v">${mem}<small>%</small></div>
+        <div class="bar"><i style=${{width:mem+"%",background:"var(--safe)"}}></i></div></div>
+      ${bat
+        ? h`<div class="gauge"><div class="k">Батарея</div>
+            <div class="v">${bat.level}<small>%</small>${bat.charging && h`<span class="bolt">${I.bolt}</span>`}</div>
+            <div class="bar"><i style=${{width:bat.level+"%",background:batColor}}></i></div></div>`
+        : h`<div class="gauge"><div class="k">Работает</div>
+            <div class="v" style=${{fontSize:"1rem",marginTop:"6px"}}>${uptime(info.uptimeSec)}</div></div>`}
+    </div>`}
+
+    ${tab==="power" && h`<${PowerPage} act=${act}/>`}
+    ${tab==="pad"   && h`<${Trackpad} token=${token} say=${say} info=${info}/>`}
+    ${tab==="media" && h`<${MediaPage} act=${act} token=${token} say=${say} open=${open} info=${info} handle=${handle}/>`}
+    ${tab==="timer" && h`<${TimerPage} token=${token} info=${info} setInfo=${setInfo} say=${say} handle=${handle}/>`}
+    ${tab==="tools" && h`<${ToolsPage} token=${token} info=${info} say=${say} handle=${handle} open=${open}
+      onForget=${() => forget("")}/>`}
+
+    <nav class="nav"><div class="nav-inner">
+      ${TABS.map((t) => h`<button key=${t.id} class=${tab===t.id?"active":""} aria-current=${tab===t.id ? "page" : undefined}
+        onClick=${() => go(t.id)}>${t.icon}<span>${t.label}</span></button>`)}
+    </div></nav>
+
+    ${toast && h`<div class=${"toast"+(toast.bad?" bad":"")} role="status">${toast.text}</div>`}
+  </div>`;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(h`<${App}/>`);
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "pult-noutbuka",
+  "version": "1.0.0",
+  "description": "Пульт ноутбука с телефона: питание, трекпад, медиа, таймер сна",
+  "repo": "sacredyy/controller-for-pc",
+  "branch": "main",
+  "files": ["package.json", "server.js", "index.html", "install.js", "icon.png"],
+  "scripts": { "start": "node server.js", "install-autostart": "node install.js" },
+  "engines": { "node": ">=18" },
+  "private": true
+}

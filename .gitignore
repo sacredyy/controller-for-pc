@@ -1,0 +1,7 @@
+# личное: токен доступа и свои команды
+config.json
+# создаются на месте
+pcr.log
+pcr-launch.vbs
+vendor/
+*.new
