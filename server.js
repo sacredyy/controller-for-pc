@@ -683,6 +683,7 @@ const server = http.createServer(async (req, res) => {
 let listenTries = 0;
 server.on("error", (e) => {
   if (e.code === "EADDRINUSE" && listenTries++ < 30) return setTimeout(() => server.listen(PORT, "0.0.0.0"), 500);
+  if (e.code === "EADDRINUSE") { console.error(`  Порт ${PORT} занят — похоже, пульт уже запущен.`); process.exit(0); }
   throw e;
 });
 server.listen(PORT, "0.0.0.0", () => {

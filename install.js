@@ -22,8 +22,12 @@ const NAME = "pc-remote";
 const mode = (process.argv[2] || "install").toLowerCase();
 
 const say = (...a) => console.log(" ", ...a);
-const sh = (cmd, args, opts = {}) =>
-  spawnSync(cmd, args, { encoding: "utf8", ...opts });
+// консольные программы Windows пишут в OEM-кодировке (cp866) — иначе вместо ошибки «ромбики»
+const decoder = new TextDecoder(PLATFORM === "win32" ? "ibm866" : "utf-8");
+const sh = (cmd, args, opts = {}) => {
+  const r = spawnSync(cmd, args, opts);
+  return { ...r, stdout: r.stdout ? decoder.decode(r.stdout) : "", stderr: r.stderr ? decoder.decode(r.stderr) : "" };
+};
 
 if (!fs.existsSync(SERVER)) {
   console.error(`\n  Не нашёл server.js рядом с установщиком.\n  Положите install.js в ту же папку.\n`);
@@ -31,10 +35,18 @@ if (!fs.existsSync(SERVER)) {
 }
 
 /* ===================== Windows ===================== */
-// Через планировщик задач: запускается при входе в систему,
-// окно консоли прячем обёрткой на VBScript.
+// Через папку «Автозагрузка» пользователя: прав администратора не нужно
+// (задачу «при входе» в планировщике обычный пользователь создать не может).
+// Окно консоли прячем обёрткой на VBScript.
 const VBS = path.join(DIR, "pcr-launch.vbs");
-const TASK = "PC Remote";
+const STARTUP = path.join(process.env.APPDATA || path.join(HOME, "AppData", "Roaming"),
+  "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "PC Remote.vbs");
+const TASK = "PC Remote";   // так автозапуск ставили старые версии
+
+const stopServer = () => sh("powershell", ["-NoProfile", "-Command",
+  "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | " +
+  `Where-Object { $_.CommandLine -like '*${SERVER.replace(/'/g, "''")}*' } | ` +
+  "ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"]);
 
 const win = {
   install() {
@@ -45,27 +57,27 @@ const win = {
       `s.CurrentDirectory = "${DIR}"\r\n` +
       `cmd = "cmd /c """"${NODE}"" ""${SERVER}"" > ""${LOG}"" 2>&1"""\r\n` +
       `s.Run cmd, 0, False\r\n`);
+    // в «Автозагрузке» лежит крошечный файл, который запускает лаунчер из папки пульта
+    fs.mkdirSync(path.dirname(STARTUP), { recursive: true });
+    fs.writeFileSync(STARTUP, `CreateObject("WScript.Shell").Run """wscript.exe"" ""${VBS}""", 0, False\r\n`);
 
-    const r = sh("schtasks", ["/Create", "/TN", TASK, "/SC", "ONLOGON",
-      "/TR", `wscript.exe "${VBS}"`, "/RL", "LIMITED", "/F"]);
-    if (r.status !== 0) throw new Error((r.stderr || r.stdout || "планировщик отказал").trim());
-
-    sh("wscript.exe", [VBS], { detached: true });   // запускаем прямо сейчас
-    return "Задача «PC Remote» в планировщике, запускается при входе в систему.";
+    // старая задача планировщика запускала бы второй экземпляр
+    if (sh("schtasks", ["/Query", "/TN", TASK]).status === 0) sh("schtasks", ["/Delete", "/TN", TASK, "/F"]);
+    stopServer();   // переустановка: гасим уже запущенный, чтобы не держал порт
+    sh("wscript.exe", [VBS]);   // запускаем прямо сейчас
+    return "Пульт добавлен в «Автозагрузку», запускается при входе в Windows.";
   },
   remove() {
-    const r = sh("schtasks", ["/Delete", "/TN", TASK, "/F"]);
-    // гасим уже запущенный сервер: ищем node, который крутит наш server.js
-    sh("powershell", ["-NoProfile", "-Command",
-      "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | " +
-      "Where-Object { $_.CommandLine -like '*server.js*' } | " +
-      "ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"]);
+    const had = fs.existsSync(STARTUP) || sh("schtasks", ["/Query", "/TN", TASK]).status === 0;
+    try { fs.unlinkSync(STARTUP); } catch {}
+    sh("schtasks", ["/Delete", "/TN", TASK, "/F"]);
+    stopServer();
     try { fs.unlinkSync(VBS); } catch {}
-    return r.status === 0 ? "Задача удалена, сервер остановлен." : "Задачи и так не было.";
+    return had ? "Автозапуск убран, сервер остановлен." : "Автозапуска и так не было, сервер остановлен.";
   },
   status() {
-    const r = sh("schtasks", ["/Query", "/TN", TASK]);
-    return r.status === 0 ? "включён (планировщик задач)" : "выключен";
+    if (fs.existsSync(STARTUP)) return "включён (папка «Автозагрузка»)";
+    return sh("schtasks", ["/Query", "/TN", TASK]).status === 0 ? "включён (планировщик задач)" : "выключен";
   },
 };
 
