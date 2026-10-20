@@ -25,7 +25,7 @@ const say = (...a) => console.log(" ", ...a);
 // консольные программы Windows пишут в OEM-кодировке (cp866) — иначе вместо ошибки «ромбики»
 const decoder = new TextDecoder(PLATFORM === "win32" ? "ibm866" : "utf-8");
 const sh = (cmd, args, opts = {}) => {
-  const r = spawnSync(cmd, args, opts);
+  const r = spawnSync(cmd, args, { windowsHide: true, ...opts });
   return { ...r, stdout: r.stdout ? decoder.decode(r.stdout) : "", stderr: r.stderr ? decoder.decode(r.stderr) : "" };
 };
 

@@ -77,7 +77,7 @@ const COMMANDS = {
 
 function run(cmd, timeout = 20000) {
   return new Promise((ok, no) => exec(cmd,
-    { timeout, maxBuffer: 1 << 22, shell: PLATFORM === "win32" ? undefined : "/bin/bash" },
+    { timeout, maxBuffer: 1 << 22, windowsHide: true, shell: PLATFORM === "win32" ? undefined : "/bin/bash" },
     (e, out, err) => e ? no(new Error(err || e.message)) : ok(out)));
 }
 // без оболочки: аргументы уходят как есть, кавычки экранировать не нужно
@@ -86,7 +86,7 @@ function runFile(bin, args, timeout = 8000) {
     (e, out, err) => e ? no(new Error(err || e.message)) : ok(out)));
 }
 function hasBinary(name) {
-  return spawnSync(PLATFORM === "win32" ? "where" : "which", [name], { stdio: "ignore" }).status === 0;
+  return spawnSync(PLATFORM === "win32" ? "where" : "which", [name], { stdio: "ignore", windowsHide: true }).status === 0;
 }
 
 /* ========== размер экрана (для кликов по живой картинке) ========== */
@@ -96,7 +96,7 @@ let SCREEN = { w: 1920, h: 1080 };
     if (PLATFORM === "win32") {
       const r = spawnSync("powershell", ["-NoProfile", "-Command",
         'Add-Type -AssemblyName System.Windows.Forms;$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds;"$($b.Width) $($b.Height)"'],
-        { encoding: "utf8" });
+        { encoding: "utf8", windowsHide: true });
       const m = String(r.stdout).trim().split(/\s+/).map(Number);
       if (m[0] > 0) SCREEN = { w: m[0], h: m[1] };
     } else if (PLATFORM === "linux" && hasBinary("xdotool")) {
@@ -215,7 +215,7 @@ function startHelper() {
   const f = path.join(TMP, PLATFORM === "win32" ? "pcr-helper.ps1" : "pcr-helper.sh");
   fs.writeFileSync(f, HELPER_SRC);
   helper = PLATFORM === "win32"
-    ? spawn("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", f], { stdio: ["pipe", "ignore", "ignore"] })
+    ? spawn("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", f], { stdio: ["pipe", "ignore", "ignore"], windowsHide: true })
     : spawn("bash", [f], { stdio: ["pipe", "ignore", "ignore"] });
   const me = helper;
   // если помощник умер, запись в его stdin даёт EPIPE — без обработчика это роняет сервер
@@ -435,7 +435,7 @@ async function checkUpdate() {
     // сломанный server.js не ставим: проверяем синтаксис до замены
     const probe = path.join(TMP, "pcr-update-check.js");
     fs.writeFileSync(probe, files["server.js"]);
-    if (spawnSync(process.execPath, ["--check", probe]).status !== 0) throw new Error("новый server.js не проходит проверку");
+    if (spawnSync(process.execPath, ["--check", probe], { windowsHide: true }).status !== 0) throw new Error("новый server.js не проходит проверку");
     for (const [f, b] of Object.entries(files)) fs.writeFileSync(path.join(DIR, f + ".new"), b);
     for (const f of Object.keys(files)) fs.renameSync(path.join(DIR, f + ".new"), path.join(DIR, f));
     console.log(new Date().toLocaleTimeString(), `→ обновился ${PKG.version} → ${remote.version}, перезапускаюсь`);
@@ -491,7 +491,7 @@ function openUrl(url) {
   if (!/^https?:\/\/\S+$/i.test(url)) throw new Error("Ссылка должна начинаться с http:// или https://");
   const [bin, args] = { win32: ["rundll32", ["url.dll,FileProtocolHandler", url]],
     darwin: ["open", [url]], linux: ["xdg-open", [url]] }[PLATFORM];
-  execFile(bin, args, { detached: true, stdio: "ignore" }).unref();
+  execFile(bin, args, { detached: true, stdio: "ignore", windowsHide: true }).unref();
 }
 
 /* ========== HTTP ========== */
