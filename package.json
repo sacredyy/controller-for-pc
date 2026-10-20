@@ -1,6 +1,6 @@
 {
   "name": "pult-noutbuka",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Пульт ноутбука с телефона: питание, трекпад, медиа, таймер сна",
   "repo": "sacredyy/controller-for-pc",
   "branch": "main",

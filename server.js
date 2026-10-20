@@ -410,19 +410,23 @@ const newer = (a, b) => {
   return false;
 };
 let updating = false;
-async function checkUpdate() {
+// force — проверка по кнопке с телефона: не ждём паузы и сообщаем, чем кончилось
+async function checkUpdate(force = false) {
   const base = process.env.PCR_UPDATE_BASE ||   // свой адрес — для проверки обновлений локально
     (/^[\w.-]+\/[\w.-]+$/.test(PKG.repo || "") && `https://raw.githubusercontent.com/${PKG.repo}/${PKG.branch || "main"}`);
-  if (config.autoUpdate === false || !base || updating) return;
+  if (!base) return { status: "off" };
+  if (updating) return { status: "busy" };
+  if (!force && config.autoUpdate === false) return;
+  if (force && timer) return { status: "timer" };
   // перезапуск сбросит таймер и оборвёт управление — ждём, пока пультом не пользуются
-  if (timer || active()) return setTimeout(checkUpdate, 2 * 60000);
+  if (!force && (timer || active())) return setTimeout(checkUpdate, 2 * 60000);
   const raw = (f) => `${base}/${f}?t=${Date.now()}`;
   updating = true;
   try {
     const r = await fetch(raw("package.json"), { signal: AbortSignal.timeout(15000) });
-    if (!r.ok) return;
+    if (!r.ok) throw new Error(`GitHub ответил ${r.status}`);
     const remote = await r.json();
-    if (!newer(remote.version, PKG.version)) return;
+    if (!newer(remote.version, PKG.version)) return { status: "latest", version: PKG.version };
     const names = Array.isArray(remote.files) ? remote.files : [];
     if (!names.includes("server.js") || !names.includes("package.json")) throw new Error("в package.json нет списка файлов");
     const files = {};
@@ -439,8 +443,9 @@ async function checkUpdate() {
     for (const [f, b] of Object.entries(files)) fs.writeFileSync(path.join(DIR, f + ".new"), b);
     for (const f of Object.keys(files)) fs.renameSync(path.join(DIR, f + ".new"), path.join(DIR, f));
     console.log(new Date().toLocaleTimeString(), `→ обновился ${PKG.version} → ${remote.version}, перезапускаюсь`);
-    restartSelf();
-  } catch (e) { console.error("обновление:", e.message); }
+    setTimeout(restartSelf, 500);   // сначала ответим телефону
+    return { status: "updating", version: remote.version };
+  } catch (e) { console.error("обновление:", e.message); return { status: "error", error: e.message }; }
   finally { updating = false; }
 }
 function restartSelf() {
@@ -582,6 +587,8 @@ const server = http.createServer(async (req, res) => {
       if (battery === null) pollBattery();
       return send(res, 200, info());
     }
+
+    if (req.method === "POST" && p === "/api/update") return send(res, 200, await checkUpdate(true));
 
     if (req.method === "POST" && p === "/api/action") {
       const { action } = await body(req);

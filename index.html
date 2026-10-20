@@ -253,6 +253,8 @@
     padding:15px;border-radius:16px;transition:transform .09s;position:relative}
   .night .go:active{transform:scale(.97)}
 
+  .ver{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:30px;
+    color:var(--muted);font-weight:700;font-size:.86rem}
   .ghost{display:block;margin:30px auto 0;color:var(--faint);font-weight:700;font-size:.84rem;padding:10px 14px}
 
   /* навигация */
@@ -912,6 +914,23 @@ function Clipboard({ token, info, say, handle }) {
   </div>`;
 }
 
+function Version({ token, info, say, handle }) {
+  const [busy, setBusy] = useState(false);
+  const check = () => {
+    buzz(); setBusy(true);
+    api(token, "POST", "/api/update", null, 90000).then((r) => {
+      const msg = { latest: "Уже последняя версия", updating: `Ставлю ${r.version}, пульт перезапустится…`,
+        timer: "Сначала отмените таймер сна", busy: "Обновление уже идёт", off: "Обновления не настроены",
+        error: "Не вышло: " + r.error }[r.status] || "Готово";
+      say(msg, r.status === "error");
+    }).catch(handle).finally(() => setBusy(false));
+  };
+  return h`<div class="ver">
+    <span>Версия ${info ? info.version : "…"}</span>
+    <button class="chip" disabled=${busy} onClick=${check}>${busy ? "Проверяю…" : "Проверить обновления"}</button>
+  </div>`;
+}
+
 function ToolsPage({ token, info, say, handle, open, onForget }) {
   const [link, setLink] = useState("");
   const custom = (info && info.custom) || [];
@@ -936,6 +955,7 @@ function ToolsPage({ token, info, say, handle, open, onForget }) {
         </div>`
       : h`<div class="note plain">Добавьте их в <b>config.json</b> рядом с сервером — и они появятся здесь кнопками.</div>`}
 
+    <${Version} token=${token} info=${info} say=${say} handle=${handle}/>
     <button class="ghost" onClick=${onForget}>Отключить этот телефон</button>
   </div>`;
 }
