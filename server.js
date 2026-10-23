@@ -19,7 +19,10 @@ let config = { customCommands: [] };
 try { Object.assign(config, JSON.parse(fs.readFileSync(CONFIG, "utf8"))); } catch {}
 if (!config.token) config.token = crypto.randomBytes(16).toString("hex");
 if (!Array.isArray(config.customCommands)) config.customCommands = [];
-if (!config.night) config.night = { volume: 15, minutes: 45, dimSteps: 4 };
+if (!config.night) config.night = { minutes: 45 };
+// раньше ночной режим гасил экран почти в ноль и убавлял звук до 15% — теперь мягче
+if ("dimSteps" in config.night) { delete config.night.dimSteps; delete config.night.volume; }
+config.night = { brightness: 70, sound: 50, ...config.night };
 fs.writeFileSync(CONFIG, JSON.stringify(config, null, 2));
 
 const TOKEN = Buffer.from(config.token);
@@ -398,13 +401,24 @@ function setTimer(action, minutes) {
 function clearTimer() { if (timer) clearTimeout(timer.handle); timer = null; }
 
 /* ========== режим «уже сплю» ========== */
-async function nightMode(minutes) {
-  const n = config.night;
-  const steps = Math.max(0, Number(n.dimSteps) || 4);
-  for (let i = 0; i < steps; i++) {
-    try { await run(COMMANDS.brightDown, 6000); } catch {}
+// яркость только убавляем: если экран уже темнее, не трогаем
+async function dimTo(n) {
+  if (PLATFORM === "win32") await run(PS("$b=(Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightness).CurrentBrightness;if($b -gt " + n + "){(Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods).WmiSetBrightness(1," + n + ")}"), 8000);
+  else if (PLATFORM === "linux") await run(`b=$(brightnessctl -m | cut -d, -f4 | tr -d %); [ "$b" -gt ${n} ] && brightnessctl set ${n}% || true`, 6000);
+  else {
+    // на macOS текущую яркость не узнать — убавляем на столько шагов (из 16), сколько процентов просят снять
+    for (let i = 0; i < Math.round((100 - n) / 6.25); i++) await run(COMMANDS.brightDown, 6000);
   }
-  try { await setVolume(Number(n.volume) || 15); } catch {}
+}
+async function nightMode(minutes, dim) {
+  const n = config.night;
+  if (dim) {
+    try { await dimTo(Math.max(5, Math.min(100, Number(n.brightness) || 70))); } catch {}
+    try {
+      const v = await getVolume(), to = Math.max(0, Math.min(100, Number(n.sound) || 50));
+      if (v === null || v > to) await setVolume(to);
+    } catch {}
+  }
   setTimer("sleep", minutes);
 }
 
@@ -491,7 +505,7 @@ function info() {
     uptimeSec: Math.round(os.uptime()), cpu: cpuPercent,
     memUsed: os.totalmem() - os.freemem(), memTotal: os.totalmem(),
     input: INPUT_OK, inputNeeds: INPUT_OK ? null : INPUT_NEEDS, clipboard: CLIP_OK,
-    volume, battery, screen: SCREEN, night: { minutes: config.night.minutes, volume: config.night.volume },
+    volume, battery, screen: SCREEN, night: { minutes: config.night.minutes, brightness: config.night.brightness, sound: config.night.sound },
     timer: timer ? { action: timer.action, at: timer.at } : null,
     version: PKG.version,
     custom: config.customCommands.map(({ id, label }) => ({ id, label })),
@@ -618,11 +632,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && p === "/api/night") {
-      const { minutes } = await body(req);
+      const { minutes, dim = true } = await body(req);
       const m = Number(minutes) || config.night.minutes;
       if (!(m > 0 && m <= 1440)) return send(res, 400, { error: "От 1 до 1440 минут" });
-      console.log(new Date().toLocaleTimeString(), "→ режим «уже сплю»,", m, "мин");
-      nightMode(m).catch((e) => console.error("night:", e.message));
+      console.log(new Date().toLocaleTimeString(), "→ режим «уже сплю»,", m, "мин", dim ? "" : "(без приглушения)");
+      nightMode(m, !!dim).catch((e) => console.error("night:", e.message));
       return send(res, 200, { ok: true, minutes: m });
     }
 
