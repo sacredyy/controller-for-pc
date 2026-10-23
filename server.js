@@ -443,9 +443,18 @@ async function checkUpdate(force = false) {
   if (force && timer) return { status: "timer" };
   // перезапуск сбросит таймер и оборвёт управление — ждём, пока пультом не пользуются
   if (!force && (timer || active())) return setTimeout(checkUpdate, 2 * 60000);
-  const raw = (f) => `${base}/${f}?t=${Date.now()}`;
+  let pinned = base;
+  const raw = (f) => `${pinned}/${f}?t=${Date.now()}`;
   updating = true;
   try {
+    // raw-адрес ветки GitHub кэширует до 5 минут и может отдать старую версию — берём файлы по номеру коммита
+    if (!process.env.PCR_UPDATE_BASE) try {
+      const c = await fetch(`https://api.github.com/repos/${PKG.repo}/commits/${PKG.branch || "main"}`,
+        { headers: { Accept: "application/vnd.github.sha", "User-Agent": "pult-noutbuka" }, signal: AbortSignal.timeout(15000) });
+      const sha = c.ok && (await c.text()).trim();
+      if (/^[0-9a-f]{40}$/.test(sha)) pinned = `https://raw.githubusercontent.com/${PKG.repo}/${sha}`;
+    } catch {}
+
     const r = await fetch(raw("package.json"), { signal: AbortSignal.timeout(15000) });
     if (!r.ok) throw new Error(`GitHub ответил ${r.status}`);
     const remote = await r.json();
