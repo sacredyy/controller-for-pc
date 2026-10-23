@@ -799,15 +799,15 @@ function NightCard({ token, say, handle, info }) {
   const [dim, setDim] = useState(() => store.get("pcr-night-dim", "1") === "1");
   const pickDim = (v) => { setDim(v); store.set("pcr-night-dim", v ? "1" : "0"); };
   const go = () => { buzz(40); api(token, "POST", "/api/night", { minutes: mins, dim })
-    .then(() => say(`Спокойной ночи — усну через ${mins} мин`)).catch(handle); };
+    .then(() => say(`Спокойной ночи — выключусь через ${mins} мин`)).catch(handle); };
   const opts = [30, 45, 60, 90];
   return h`<div class="night">
     <h3>${I.bed} Уже сплю</h3>
-    <p>${dim ? `Убавлю яркость до ${n.brightness || 70}% и звук до ${n.sound || 50}%, а через выбранное время усыплю ноутбук.`
-      : "Яркость и звук не трогаю — просто усыплю ноутбук через выбранное время."}</p>
+    <p>${dim ? `Убавлю яркость до ${n.brightness || 70}% и звук до ${n.sound || 50}%, а через выбранное время выключу ноутбук.`
+      : "Яркость и звук не трогаю — просто выключу ноутбук через выбранное время."}</p>
     <${Seg} small label="Яркость и звук" value=${dim} onChange=${pickDim}
       options=${[[true, "Приглушить"], [false, "Не трогать"]]}/>
-    <${Seg} label="Через сколько уснуть" value=${mins} onChange=${setMins}
+    <${Seg} label="Через сколько выключить" value=${mins} onChange=${setMins}
       options=${(opts.includes(mins) ? opts : [...opts, mins].sort((a, b) => a - b)).map((m) => [m, dur(m)])}/>
     <button class="go" onClick=${go}>Спокойной ночи</button>
   </div>`;

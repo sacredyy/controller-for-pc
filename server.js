@@ -419,7 +419,7 @@ async function nightMode(minutes, dim) {
       if (v === null || v > to) await setVolume(to);
     } catch {}
   }
-  setTimer("sleep", minutes);
+  setTimer("shutdown", minutes);
 }
 
 /* ========== автообновление с GitHub ==========
