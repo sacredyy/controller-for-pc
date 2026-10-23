@@ -147,6 +147,12 @@
   .kbd-btn:active{transform:scale(.94)}
   .kbd-btn svg{width:22px;height:22px}
   .kbd-btn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+  .zoom-bar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;margin-top:10px;background:var(--line);
+    border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .zoom-bar button{background:var(--surface);padding:12px 6px;font-weight:700;font-size:.84rem;
+    display:flex;align-items:center;justify-content:center;gap:7px;transition:background .12s}
+  .zoom-bar button:active{background:var(--surface2)}
+  .zoom-bar svg{width:19px;height:19px;color:var(--muted)}
 
   /* переключатели */
   .seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px}
@@ -366,6 +372,8 @@ const I = {
   youtube: sv('<rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9.5l5 2.5-5 2.5z"/>'),
   windows: sv('<rect x="3" y="4" width="13" height="10" rx="1.5"/><path d="M8 18h11a1.5 1.5 0 0 0 1.5-1.5V9"/>'),
   desktop: sv('<rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4M7 13h10"/>'),
+  zoomIn:  sv('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4M8 11h6M11 8v6"/>'),
+  zoomOut: sv('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4M8 11h6"/>'),
   close:   sv('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8h18M10 12l4 4M14 12l-4 4"/>'),
 };
 
@@ -560,7 +568,8 @@ function Trackpad({ token, say, info }) {
     } else {
       s.maxPts = Math.max(s.maxPts, s.pts.size);
       s.dragArm = false;
-      if (!s.dragging && s.mode !== "scroll") { s.mode = "scroll"; s.axis = null; s.sum = { x: 0, y: 0 }; setScrolling(true); }
+      if (!s.dragging && s.mode !== "scroll" && s.mode !== "pinch") { s.mode = "scroll"; s.axis = null; s.sum = { x: 0, y: 0 }; setScrolling(true); }
+      if (s.mode === "scroll" && s.pts.size === 2) s.pinch = spread();
     }
     setUsed(true);
     padRef.current.setPointerCapture(e.pointerId);
@@ -574,6 +583,17 @@ function Trackpad({ token, say, info }) {
     const dx = e.clientX - p.x, dy = e.clientY - p.y;
     p.x = e.clientX; p.y = e.clientY;
     s.moved += Math.abs(dx) + Math.abs(dy);
+
+    // пальцы расходятся или сходятся — это щипок, а не прокрутка: меняем масштаб на ноутбуке
+    if (s.mode === "scroll" && s.pts.size === 2 && !s.axis && Math.abs(spread() - s.pinch) > 36) {
+      s.mode = "pinch"; s.pinch = spread(); s.sc = { x: 0, y: 0 }; setScrolling(false);
+    }
+    if (s.mode === "pinch") {
+      if (s.pts.size !== 2) return;
+      const d = spread() - s.pinch;
+      if (Math.abs(d) >= 60) { s.pinch = spread(); buzz(8); combo(d > 0 ? "zoomIn" : "zoomOut"); }
+      return;
+    }
 
     if (s.mode === "scroll" || s.mode === "strip") {
       const n = s.mode === "scroll" ? s.pts.size : 1;
@@ -603,6 +623,11 @@ function Trackpad({ token, say, info }) {
     s.acc.y += dy * speedRef.current * accel;
   };
 
+  const spread = () => {
+    const [a, b] = [...st.current.pts.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
+
   const onUp = (e) => {
     const s = st.current;
     if (!s.pts.has(e.pointerId)) return;
@@ -619,6 +644,7 @@ function Trackpad({ token, say, info }) {
       s.lastTap = 0;
     }
     else if (s.mode === "strip") glide();
+    else if (s.mode === "pinch") s.lastTap = 0;
     else if (quick && s.moved < 12) {
       ripple(e.clientX - r.left, e.clientY - r.top); buzz(14);
       post({ op: "click" });
@@ -647,7 +673,7 @@ function Trackpad({ token, say, info }) {
       <div class="mesh"></div>
       <div class="tip"><div><b>Водите пальцем</b> — курсор едет<br/>касание — клик<br/>
         <b>двумя пальцами</b> — прокрутка<br/>касание двумя — правая кнопка<br/>
-        двойное касание и вести — перетащить<br/><b>полоса справа</b> — листать одним пальцем</div></div>
+        двойное касание и вести — перетащить<br/><b>щипок</b> — крупнее или мельче<br/><b>полоса справа</b> — листать одним пальцем</div></div>
       <div class=${"strip"+(scrolling?" on":"")} aria-hidden="true">${I.chevUp}<div class="rail"></div>${I.chevDown}</div>
       ${ripples.map((r) => h`<span class="ripple" key=${r.id} style=${{left:r.x+"px",top:r.y+"px"}}></span>`)}
     </div>
@@ -661,6 +687,11 @@ function Trackpad({ token, say, info }) {
         aria-label=${kbd ? "Скрыть клавиатуру" : "Показать клавиатуру"} onClick=${toggleKbd}>${I.keyboard}</button>
       <${Seg} small label="Скорость курсора" value=${speed} onChange=${pickSpeed}
         options=${SPEEDS.map(([v, l]) => [v, l])}/>
+    </div>
+    <div class="zoom-bar" role="group" aria-label="Масштаб на ноутбуке">
+      <button onClick=${() => { buzz(); combo("zoomOut"); }}>${I.zoomOut} Мельче</button>
+      <button onClick=${() => { buzz(); combo("zoomReset"); }}>100%</button>
+      <button onClick=${() => { buzz(); combo("zoomIn"); }}>${I.zoomIn} Крупнее</button>
     </div>
 
     ${kbd && h`<div class="kbd" ref=${kbdRef}>

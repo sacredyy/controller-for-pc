@@ -152,6 +152,9 @@ while ($true) {
           'switch'  { [M]::keybd_event(0x12,0,0,0); [M]::keybd_event(0x09,0,0,0); [M]::keybd_event(0x09,0,2,0); [M]::keybd_event(0x12,0,2,0) }
           'desktop' { [M]::keybd_event(0x5B,0,0,0); [M]::keybd_event(0x44,0,0,0); [M]::keybd_event(0x44,0,2,0); [M]::keybd_event(0x5B,0,2,0) }
           'close'   { [M]::keybd_event(0x12,0,0,0); [M]::keybd_event(0x73,0,0,0); [M]::keybd_event(0x73,0,2,0); [M]::keybd_event(0x12,0,2,0) }
+          'zoomIn'  { [M]::keybd_event(0x11,0,0,0); [M]::keybd_event(0xBB,0,0,0); [M]::keybd_event(0xBB,0,2,0); [M]::keybd_event(0x11,0,2,0) }
+          'zoomOut' { [M]::keybd_event(0x11,0,0,0); [M]::keybd_event(0xBD,0,0,0); [M]::keybd_event(0xBD,0,2,0); [M]::keybd_event(0x11,0,2,0) }
+          'zoomReset' { [M]::keybd_event(0x11,0,0,0); [M]::keybd_event(0x30,0,0,0); [M]::keybd_event(0x30,0,2,0); [M]::keybd_event(0x11,0,2,0) }
         }
       }
     }
@@ -178,6 +181,9 @@ while IFS= read -r line; do
         switch)  xdotool key --clearmodifiers alt+Tab ;;
         desktop) xdotool key --clearmodifiers super+d ;;
         close)   xdotool key --clearmodifiers alt+F4 ;;
+        zoomIn)  xdotool key --clearmodifiers ctrl+equal ;;
+        zoomOut) xdotool key --clearmodifiers ctrl+minus ;;
+        zoomReset) xdotool key --clearmodifiers ctrl+0 ;;
       esac ;;
   esac
 done`,
@@ -201,6 +207,9 @@ while IFS= read -r line; do
         switch)  osascript -e 'tell app "System Events" to key code 48 using command down' ;;
         desktop) osascript -e 'tell app "System Events" to key code 3 using {command down, option down}' ;;
         close)   osascript -e 'tell app "System Events" to key code 13 using command down' ;;
+        zoomIn)  osascript -e 'tell app "System Events" to key code 24 using command down' ;;
+        zoomOut) osascript -e 'tell app "System Events" to key code 27 using command down' ;;
+        zoomReset) osascript -e 'tell app "System Events" to key code 29 using command down' ;;
       esac ;;
   esac
 done`,
@@ -642,7 +651,7 @@ const server = http.createServer(async (req, res) => {
         if (!k) return send(res, 400, { error: "Неизвестная клавиша" });
         sendInput(`key ${k}`);
       } else if (op === "combo") {
-        if (!["switch", "desktop", "close"].includes(key)) return send(res, 400, { error: "Неизвестная комбинация" });
+        if (!["switch", "desktop", "close", "zoomIn", "zoomOut", "zoomReset"].includes(key)) return send(res, 400, { error: "Неизвестная комбинация" });
         sendInput(`combo ${key}`);
       } else if (op === "type") {
         const t = String(text || "").replace(/[\r\n]+/g, " ").slice(0, 500);
